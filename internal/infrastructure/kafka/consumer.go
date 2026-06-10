@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type MessageHandler func(ctx context.Context, key string, value []byte) error
+type MessageHandler = func(ctx context.Context, key string, value []byte) error
 
 type Consumer struct {
 	reader *kafka.Reader
