@@ -84,4 +84,12 @@ Este arquivo documenta o progresso de desenvolvimento dos 12 estágios da aplica
   - [x] Criado script portátil `scripts/check_coverage.go` e regra `test-coverage` no Makefile
   - [x] Configurada Pipeline CI/CD com GitHub Actions executando builds, testes e exigindo cobertura de **80%**
 
-* **[ ] Stage 12: Documentation & README**
+* **[x] Stage 12: Documentation & README**
+  - [x] Criado o arquivo `README.md` completo e formatado com badges de tecnologias
+  - [x] Documentados os fluxos de criação de pagamento e processamento assíncrono via diagrama sequencial Mermaid
+  - [x] Documentada a árvore estrutural de diretórios e padrões de Clean Architecture do projeto
+  - [x] Incluído guia de início rápido e execução via Docker Compose
+  - [x] Mapeados todos os comandos de atalho de desenvolvimento via `Makefile`
+  - [x] Adicionado guia para acesso e execução da interface interativa do Swagger UI
+  - [x] Mapeados os endpoints de rastreamento distribuído (Jaeger) e coleta de métricas (Prometheus)
+
