@@ -28,6 +28,8 @@ out/
 coverage.out
 coverage.html
 *.coverprofile
+coverage_filtered.out
+coverage
 
 # Benchmark
 

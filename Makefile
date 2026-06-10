@@ -1,4 +1,4 @@
-.PHONY: build run-api run-worker swagger docker-build up down clean test
+.PHONY: build run-api run-worker swagger docker-build up down clean test test-coverage
 
 build:
 	go build -o bin/api ./cmd/api
@@ -28,3 +28,7 @@ clean:
 
 test:
 	go test -v ./...
+
+test-coverage:
+	go test -coverprofile coverage.out ./internal/domain ./internal/application ./internal/interfaces/http ./pkg/security ./internal/infrastructure/postgres ./internal/infrastructure/redis
+	go run scripts/check_coverage.go coverage.out 80

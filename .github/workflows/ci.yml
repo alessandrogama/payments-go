@@ -1,0 +1,32 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.26.x'
+        cache: true
+
+    - name: Install Dependencies
+      run: go mod download
+
+    - name: Build Applications
+      run: |
+        go build -v -o bin/api ./cmd/api
+        go build -v -o bin/worker ./cmd/worker
+
+    - name: Run Tests and Check Coverage
+      run: make test-coverage
