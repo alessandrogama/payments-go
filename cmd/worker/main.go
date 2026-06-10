@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/aless/gopay-processing-engine/internal/infrastructure/postgres"
 	"github.com/aless/gopay-processing-engine/internal/infrastructure/redis"
 	"github.com/aless/gopay-processing-engine/pkg/logger"
+	"github.com/aless/gopay-processing-engine/pkg/telemetry"
 	"go.uber.org/zap"
 )
 
@@ -38,6 +40,35 @@ func main() {
 		zap.Strings("kafka_brokers", cfg.KafkaBrokers),
 		zap.String("kafka_group", cfg.KafkaGroupID),
 	)
+
+	// 2.5. Initialize OTel Tracer
+	otelCtx, otelCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer otelCancel()
+	shutdownTracer, err := telemetry.InitTracer(otelCtx, cfg.OTELServiceName+"-worker", cfg.OTELJaegerEndpoint)
+	if err != nil {
+		logger.Warn("Failed to initialize OTel Tracer", zap.Error(err))
+	} else {
+		defer func() {
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer shutdownCancel()
+			shutdownTracer(shutdownCtx)
+		}()
+	}
+
+	// 2.6. Start Prometheus scraping server (using port + 1 to avoid conflicts with API metrics)
+	workerMetricsPort := "2113"
+	if cfg.PrometheusPort != "" {
+		if portInt, err := strconv.Atoi(cfg.PrometheusPort); err == nil {
+			workerMetricsPort = strconv.Itoa(portInt + 1)
+		}
+	}
+
+	metricsSrv := telemetry.StartMetricsServer(workerMetricsPort)
+	defer func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer shutdownCancel()
+		_ = metricsSrv.Shutdown(shutdownCtx)
+	}()
 
 	// 3. Connect to PostgreSQL
 	db, err := postgres.NewConnection(cfg)

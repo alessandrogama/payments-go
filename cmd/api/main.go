@@ -16,6 +16,7 @@ import (
 	"github.com/aless/gopay-processing-engine/internal/infrastructure/redis"
 	httpInterfaces "github.com/aless/gopay-processing-engine/internal/interfaces/http"
 	"github.com/aless/gopay-processing-engine/pkg/logger"
+	"github.com/aless/gopay-processing-engine/pkg/telemetry"
 	"go.uber.org/zap"
 )
 
@@ -38,6 +39,28 @@ func main() {
 		zap.String("env", cfg.AppEnv),
 		zap.String("port", cfg.HTTPServerPort),
 	)
+
+	// 2.5. Initialize OTel Tracer
+	otelCtx, otelCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer otelCancel()
+	shutdownTracer, err := telemetry.InitTracer(otelCtx, cfg.OTELServiceName, cfg.OTELJaegerEndpoint)
+	if err != nil {
+		logger.Warn("Failed to initialize OTel Tracer", zap.Error(err))
+	} else {
+		defer func() {
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer shutdownCancel()
+			shutdownTracer(shutdownCtx)
+		}()
+	}
+
+	// 2.6. Start Prometheus scraping server
+	metricsSrv := telemetry.StartMetricsServer(cfg.PrometheusPort)
+	defer func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer shutdownCancel()
+		_ = metricsSrv.Shutdown(shutdownCtx)
+	}()
 
 	// 3. Connect to Database
 	db, err := postgres.NewConnection(cfg)

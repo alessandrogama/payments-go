@@ -3,12 +3,14 @@ package http
 import (
 	"github.com/aless/gopay-processing-engine/internal/config"
 	"github.com/aless/gopay-processing-engine/internal/middleware"
+	"github.com/aless/gopay-processing-engine/pkg/telemetry"
 	"github.com/gin-gonic/gin"
 )
 
 // SetupRouter initializes routes and hooks middleware.
 func SetupRouter(cfg *config.Config, authHandler *AuthHandler, paymentHandler *PaymentHandler) *gin.Engine {
 	r := gin.Default()
+	r.Use(telemetry.MetricsMiddleware())
 
 	// Public routes
 	auth := r.Group("/auth")

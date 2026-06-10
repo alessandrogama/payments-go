@@ -10,6 +10,7 @@ import (
 	"github.com/aless/gopay-processing-engine/internal/config"
 	"github.com/aless/gopay-processing-engine/internal/domain"
 	"github.com/aless/gopay-processing-engine/pkg/logger"
+	"github.com/aless/gopay-processing-engine/pkg/telemetry"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -56,12 +57,14 @@ func (w *PaymentWorker) Start(ctx context.Context) error {
 
 // ProcessEvent parses the message, updates state, and runs payment authorization with retries.
 func (w *PaymentWorker) ProcessEvent(ctx context.Context, key string, value []byte) error {
+	startTime := time.Now()
 	logger.Info("Worker received payment event", zap.String("key", key))
 
 	// 1. Unmarshal the payment payload
 	var evtPayment domain.Payment
 	if err := json.Unmarshal(value, &evtPayment); err != nil {
 		logger.Error("Worker received corrupt payload, routing to DLQ", zap.Error(err))
+		telemetry.KafkaEventsProcessedTotal.WithLabelValues(w.cfg.KafkaTopicCreated, "corrupt").Inc()
 		w.routeToDLQ(ctx, key, value, "corrupt_payload: "+err.Error())
 		return nil // Return nil so offset is committed and queue is not blocked
 	}
@@ -71,10 +74,12 @@ func (w *PaymentWorker) ProcessEvent(ctx context.Context, key string, value []by
 	if err != nil {
 		if errors.Is(err, domain.ErrPaymentNotFound) {
 			logger.Error("Worker: payment not found in database, routing to DLQ", zap.String("payment_id", evtPayment.ID.String()))
+			telemetry.KafkaEventsProcessedTotal.WithLabelValues(w.cfg.KafkaTopicCreated, "not_found").Inc()
 			w.routeToDLQ(ctx, key, value, "payment_not_found")
 			return nil
 		}
 		logger.Error("Worker: database error fetching payment", zap.String("payment_id", evtPayment.ID.String()), zap.Error(err))
+		telemetry.KafkaEventsProcessedTotal.WithLabelValues(w.cfg.KafkaTopicCreated, "db_error").Inc()
 		return err // Retry reading this event from Kafka
 	}
 
@@ -84,16 +89,19 @@ func (w *PaymentWorker) ProcessEvent(ctx context.Context, key string, value []by
 			zap.String("payment_id", payment.ID.String()),
 			zap.String("current_status", payment.Status),
 		)
+		telemetry.KafkaEventsProcessedTotal.WithLabelValues(w.cfg.KafkaTopicCreated, "skipped").Inc()
 		return nil
 	}
 
 	// 4. Transition status to PROCESSING
 	if err := payment.TransitionTo(domain.StatusProcessing); err != nil {
 		logger.Error("Worker: failed to transition payment to PROCESSING state", zap.String("payment_id", payment.ID.String()), zap.Error(err))
+		telemetry.KafkaEventsProcessedTotal.WithLabelValues(w.cfg.KafkaTopicCreated, "state_error").Inc()
 		return nil
 	}
 
 	if err := w.updatePaymentState(ctx, payment); err != nil {
+		telemetry.KafkaEventsProcessedTotal.WithLabelValues(w.cfg.KafkaTopicCreated, "db_error").Inc()
 		return err
 	}
 
@@ -136,6 +144,9 @@ func (w *PaymentWorker) ProcessEvent(ctx context.Context, key string, value []by
 		_ = w.updatePaymentState(ctx, payment)
 		w.publishOutcome(ctx, w.cfg.KafkaTopicFailed, payment)
 		w.routeToDLQ(ctx, key, value, "max_retries_exceeded: "+err.Error())
+		
+		telemetry.KafkaEventsProcessedTotal.WithLabelValues(w.cfg.KafkaTopicCreated, "failed").Inc()
+		telemetry.PaymentProcessingDuration.Observe(time.Since(startTime).Seconds())
 		return nil
 	}
 
@@ -145,14 +156,19 @@ func (w *PaymentWorker) ProcessEvent(ctx context.Context, key string, value []by
 		_ = payment.TransitionTo(domain.StatusApproved)
 		_ = w.updatePaymentState(ctx, payment)
 		w.publishOutcome(ctx, w.cfg.KafkaTopicProcessed, payment)
+		
+		telemetry.KafkaEventsProcessedTotal.WithLabelValues(w.cfg.KafkaTopicCreated, "approved").Inc()
 	} else {
 		// Status is REJECTED
 		logger.Info("Worker: payment REJECTED by gateway", zap.String("payment_id", payment.ID.String()), zap.String("reason", gatewayResp.ErrorMessage))
 		_ = payment.TransitionTo(domain.StatusRejected)
 		_ = w.updatePaymentState(ctx, payment)
 		w.publishOutcome(ctx, w.cfg.KafkaTopicFailed, payment)
+		
+		telemetry.KafkaEventsProcessedTotal.WithLabelValues(w.cfg.KafkaTopicCreated, "rejected").Inc()
 	}
 
+	telemetry.PaymentProcessingDuration.Observe(time.Since(startTime).Seconds())
 	return nil
 }
 
