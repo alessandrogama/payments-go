@@ -39,13 +39,28 @@ func NewConnection(cfg *config.Config) (*sql.DB, error) {
 	db.SetMaxIdleConns(25)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	// Verify connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Verify connection with retry logic to handle container startup race conditions
+	var pingErr error
+	for attempt := 1; attempt <= 10; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		pingErr = db.PingContext(ctx)
+		cancel()
 
-	if err := db.PingContext(ctx); err != nil {
+		if pingErr == nil {
+			break
+		}
+
+		logger.Warn("Failed to connect to database, retrying...",
+			zap.Int("attempt", attempt),
+			zap.String("host", cfg.DBHost),
+			zap.Error(pingErr),
+		)
+		time.Sleep(1 * time.Second)
+	}
+
+	if pingErr != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+		return nil, fmt.Errorf("failed to connect to database after 10 attempts: %w", pingErr)
 	}
 
 	logger.Info("Successfully connected to PostgreSQL database", zap.String("host", cfg.DBHost), zap.String("database", cfg.DBName))
