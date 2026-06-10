@@ -1,4 +1,11 @@
-# GoPay Processing Engine 🚀
+# GoPay Processing Engine
+
+[![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://golang.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Redis](https://img.shields.io/badge/Redis-7+-DC382D?style=flat-square&logo=redis&logoColor=white)](https://redis.io)
+[![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-7.3+-231F20?style=flat-square&logo=apache-kafka&logoColor=white)](https://kafka.apache.org)
+[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Tracing-F05032?style=flat-square&logo=opentelemetry&logoColor=white)](https://opentelemetry.io)
+[![Prometheus](https://img.shields.io/badge/Prometheus-Metrics-E6522C?style=flat-square&logo=prometheus&logoColor=white)](https://prometheus.io)
 
 O **GoPay Processing Engine** é um motor de processamento de pagamentos distribuído de alto desempenho, desenvolvido com foco em resiliência, consistência eventual e isolamento de domínio (**Clean Architecture**). 
 
@@ -6,7 +13,7 @@ Este ecossistema foi projetado para resolver os problemas clássicos de sistemas
 
 ---
 
-## ⚡ Diferenciais de Arquitetura e Engenharia
+## Diferenciais de Arquitetura e Engenharia
 
 ### 1. Garantia de Execução Única (Idempotência Distribuída)
 Para mitigar cobranças duplicadas em conexões instáveis, a API exige um cabeçalho `Idempotency-Key` (UUID) em todas as transações de pagamento. A verificação é realizada de forma atômica no Redis utilizando a operação `SetNX`. Requisições repetidas retornam instantaneamente a resposta armazenada em cache, sem onerar o banco de dados principal ou reprocessar o fluxo financeiro.
@@ -22,7 +29,7 @@ Mensagens corrompidas ou falhas permanentes que excedem o limite de retentativas
 
 ---
 
-## 🖥️ Topologia da Solução
+## Topologia da Solução
 
 O fluxo de processamento e a interação entre os componentes do sistema são organizados da seguinte forma:
 
@@ -68,7 +75,7 @@ sequenceDiagram
 
 ---
 
-## 📁 Estrutura de Diretórios (Clean Architecture)
+## Estrutura de Diretórios (Clean Architecture)
 
 A organização das pastas respeita estritamente o desacoplamento de camadas, garantindo que as regras de negócio de domínio permaneçam independentes de tecnologias de infraestrutura (banco de dados, frameworks HTTP ou brokers):
 
@@ -99,7 +106,7 @@ A organização das pastas respeita estritamente o desacoplamento de camadas, ga
 
 ---
 
-## 🚀 Como Iniciar
+## Como Iniciar
 
 ### Variáveis de Ambiente
 Crie as configurações locais a partir do modelo de exemplo:
@@ -123,7 +130,7 @@ Este comando subirá a seguinte estrutura local:
 
 ---
 
-## 🛠️ Comandos de Desenvolvimento (Makefile)
+## Comandos de Desenvolvimento (Makefile)
 
 O `Makefile` abstrai a complexidade operacional do projeto:
 
@@ -141,7 +148,7 @@ O `Makefile` abstrai a complexidade operacional do projeto:
 
 ---
 
-## 🎛️ Painel de Endpoints locais
+## Painel de Endpoints locais
 
 | Recurso | Endpoints | Descrição |
 | :--- | :--- | :--- |
@@ -154,7 +161,7 @@ O `Makefile` abstrai a complexidade operacional do projeto:
 
 ---
 
-## 💡 Guia de Teste Manual no Swagger UI
+## Guia de Teste Manual no Swagger UI
 
 Para testar o fluxo completo via Swagger UI:
 
