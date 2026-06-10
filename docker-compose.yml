@@ -1,0 +1,151 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: gopay-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gopay-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: gopay-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - gopay-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: gopay-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - gopay-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: gopay-kafka
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    networks:
+      - gopay-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.41
+    container_name: gopay-jaeger
+    ports:
+      - "16686:16686" # Dashboard
+      - "14268:14268" # Collector HTTP
+      - "4318:4318"   # OTLP HTTP receiver
+    networks:
+      - gopay-network
+
+  prometheus:
+    image: prom/prometheus:v2.42.0
+    container_name: gopay-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - api
+      - worker
+    networks:
+      - gopay-network
+
+  api:
+    build:
+      context: .
+      target: api
+    container_name: gopay-api
+    ports:
+      - "8080:8080"
+      - "2112:2112"
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    environment:
+      - APP_ENV=production
+      - HTTP_SERVER_PORT=8080
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SSL_MODE=disable
+      - REDIS_ADDR=redis:6379
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC_CREATED=payments.created
+      - KAFKA_TOPIC_PROCESSED=payments.processed
+      - KAFKA_TOPIC_FAILED=payments.failed
+      - KAFKA_TOPIC_DLQ=payments.dlq
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRATION_HOURS=24
+      - OTEL_SERVICE_NAME=gopay-api
+      - OTEL_JAEGER_ENDPOINT=http://jaeger:4318
+      - PROMETHEUS_PORT=2112
+    networks:
+      - gopay-network
+
+  worker:
+    build:
+      context: .
+      target: worker
+    container_name: gopay-worker
+    ports:
+      - "2113:2113"
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    environment:
+      - APP_ENV=production
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SSL_MODE=disable
+      - REDIS_ADDR=redis:6379
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_GROUP_ID=gopay-workers
+      - KAFKA_TOPIC_CREATED=payments.created
+      - KAFKA_TOPIC_PROCESSED=payments.processed
+      - KAFKA_TOPIC_FAILED=payments.failed
+      - KAFKA_TOPIC_DLQ=payments.dlq
+      - OTEL_SERVICE_NAME=gopay-worker
+      - OTEL_JAEGER_ENDPOINT=http://jaeger:4318
+      - PROMETHEUS_PORT=2113
+      - FAKE_GATEWAY_SUCCESS_RATE=80
+      - FAKE_GATEWAY_LATENCY_MS=150
+    networks:
+      - gopay-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  gopay-network:
+    driver: bridge

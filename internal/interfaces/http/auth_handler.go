@@ -29,6 +29,17 @@ type loginRequest struct {
 }
 
 // Register handles user registration request.
+// @Summary Register a new user
+// @Description Register a new user with email and password
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body registerRequest true "Registration credentials"
+// @Success 201 {object} map[string]interface{} "User ID and Email"
+// @Failure 400 {object} map[string]string "Bad request details"
+// @Failure 409 {object} map[string]string "User already exists error"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req registerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -53,6 +64,16 @@ func (h *AuthHandler) Register(c *gin.Context) {
 }
 
 // Login validates user credentials and returns a JWT token.
+// @Summary Login user
+// @Description Authenticate a user with email and password and return a JWT access token
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body loginRequest true "Login credentials"
+// @Success 200 {object} map[string]string "Access token"
+// @Failure 400 {object} map[string]string "Bad request details"
+// @Failure 401 {object} map[string]string "Invalid credentials error"
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

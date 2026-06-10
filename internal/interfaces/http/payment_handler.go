@@ -26,6 +26,20 @@ type createPaymentRequest struct {
 }
 
 // Create submits a new payment processing request.
+// @Summary Create a new payment
+// @Description Submit a new payment transaction. Requires an idempotency key to prevent double charging.
+// @Security BearerAuth
+// @Tags Payments
+// @Accept json
+// @Produce json
+// @Param Idempotency-Key header string true "Idempotency key"
+// @Param request body createPaymentRequest true "Payment details"
+// @Success 201 {object} domain.Payment "Created payment details"
+// @Failure 400 {object} map[string]string "Bad request details"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Failure 409 {object} map[string]string "Idempotency key conflict"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /payments [post]
 func (h *PaymentHandler) Create(c *gin.Context) {
 	idempotencyKey := c.GetHeader("Idempotency-Key")
 	if idempotencyKey == "" {
@@ -70,6 +84,19 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 }
 
 // GetByID retrieves a payment by its unique ID.
+// @Summary Get payment by ID
+// @Description Query specific payment details by UUID. Uses Redis cache lookup before DB query.
+// @Security BearerAuth
+// @Tags Payments
+// @Accept json
+// @Produce json
+// @Param id path string true "Payment UUID"
+// @Success 200 {object} domain.Payment "Payment details"
+// @Failure 400 {object} map[string]string "Invalid UUID format"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Failure 404 {object} map[string]string "Payment not found error"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /payments/{id} [get]
 func (h *PaymentHandler) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -92,6 +119,16 @@ func (h *PaymentHandler) GetByID(c *gin.Context) {
 }
 
 // List queries and lists all payment records in descending creation order.
+// @Summary List all payments
+// @Description Fetch all payment transactions ordered by creation date descending.
+// @Security BearerAuth
+// @Tags Payments
+// @Accept json
+// @Produce json
+// @Success 200 {array} domain.Payment "List of payments"
+// @Failure 401 {object} map[string]string "Unauthorized"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /payments [get]
 func (h *PaymentHandler) List(c *gin.Context) {
 	payments, err := h.paymentService.ListPayments(c.Request.Context())
 	if err != nil {
